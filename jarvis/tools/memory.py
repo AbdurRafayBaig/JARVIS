@@ -33,6 +33,14 @@ class RememberProjectTool(BaseTool):
         context: Optional[str] = None,
         **kwargs,
     ) -> ToolResult:
+        """Remember or create a project context.
+
+        Args:
+            name: Short name to remember the project by.
+            path: Filesystem path of the project.
+            description: What the project is.
+            context: Anything else worth recalling later, such as stack or conventions.
+        """
         try:
             mem = ProjectMemory()
             existing = await mem.get_project_by_path(path)
@@ -70,6 +78,11 @@ class GetProjectMemoryTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, query: str, **kwargs) -> ToolResult:
+        """Get project context by name or path.
+
+        Args:
+            query: Project name or path to look up.
+        """
         try:
             mem = ProjectMemory()
             projects = await mem.list_projects()
@@ -135,6 +148,12 @@ class SetPreferenceTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, key: str, value: str, **kwargs) -> ToolResult:
+        """Set a user preference.
+
+        Args:
+            key: Preference name.
+            value: Value to store for it.
+        """
         try:
             mem = ProjectMemory()
             pref = await mem.set_preference(key, value)
@@ -160,6 +179,11 @@ class GetPreferenceTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, key: str, **kwargs) -> ToolResult:
+        """Get a user preference.
+
+        Args:
+            key: Preference name to read.
+        """
         try:
             mem = ProjectMemory()
             val = await mem.get_preference(key)

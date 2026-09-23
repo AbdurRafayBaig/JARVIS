@@ -25,6 +25,13 @@ class CreateRepoTool(BaseTool):
         return ToolRiskLevel.SENSITIVE
 
     async def execute(self, name: str, description: Optional[str] = None, private: bool = False, **kwargs) -> ToolResult:
+        """Create a GitHub repository.
+
+        Args:
+            name: Name for the new repository.
+            description: Short description shown on the repository page.
+            private: Create it private rather than public.
+        """
         try:
             from jarvis.integrations.github_client import get_github_client
             client = get_github_client()
@@ -51,6 +58,12 @@ class ListReposTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, username: Optional[str] = None, **kwargs) -> ToolResult:
+        """List GitHub repositories.
+
+        Args:
+            username: Account whose repositories to list. Omit for the authenticated
+                user.
+        """
         try:
             from jarvis.integrations.github_client import get_github_client
             client = get_github_client()
@@ -78,6 +91,13 @@ class ListIssuesTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, owner: str, repo: str, state: str = "open", **kwargs) -> ToolResult:
+        """List issues in a repository.
+
+        Args:
+            owner: Repository owner, a user or organisation.
+            repo: Repository name.
+            state: Which issues to return: open, closed, or all.
+        """
         try:
             from jarvis.integrations.github_client import get_github_client
             client = get_github_client()
@@ -105,6 +125,14 @@ class CreateIssueTool(BaseTool):
         return ToolRiskLevel.SENSITIVE
 
     async def execute(self, owner: str, repo: str, title: str, body: Optional[str] = None, **kwargs) -> ToolResult:
+        """Create a GitHub issue.
+
+        Args:
+            owner: Repository owner, a user or organisation.
+            repo: Repository name.
+            title: Issue title.
+            body: Issue body in Markdown.
+        """
         try:
             from jarvis.integrations.github_client import get_github_client
             client = get_github_client()
@@ -140,6 +168,16 @@ class CreatePRTool(BaseTool):
         body: Optional[str] = None,
         **kwargs,
     ) -> ToolResult:
+        """Create a pull request.
+
+        Args:
+            owner: Repository owner, a user or organisation.
+            repo: Repository name.
+            title: Pull request title.
+            head: Branch containing the changes.
+            base: Branch to merge into, such as main.
+            body: Pull request description in Markdown.
+        """
         try:
             from jarvis.integrations.github_client import get_github_client
             client = get_github_client()

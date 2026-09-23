@@ -42,7 +42,11 @@ class RespondTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, message: str) -> ToolResult:
-        """Send a response to the user."""
+        """Send a response to the user.
+
+        Args:
+            message: The message to say to the user.
+        """
         return ToolResult(success=True, data=message)
 
 

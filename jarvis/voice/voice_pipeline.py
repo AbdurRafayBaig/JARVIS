@@ -9,8 +9,8 @@ from typing import Optional, Callable, Any
 from loguru import logger
 
 from jarvis.core.config import get_settings
-from jarvis.voice.stt_provider import STTProvider, WhisperSTT
-from jarvis.voice.tts_provider import TTSProvider, PiperTTS
+from jarvis.voice.stt_provider import STTProvider, WhisperSTT, create_stt_provider
+from jarvis.voice.tts_provider import TTSProvider, PiperTTS, create_tts_provider
 from jarvis.voice.wake_word import WakeWordDetector, SimpleWakeWordDetector
 from jarvis.voice.audio import AudioCapture, AudioPlayback
 
@@ -30,21 +30,26 @@ class VoicePipeline:
         self._wake_callback: Optional[Callable[[], Any]] = None
         self._busy = False
 
-    def _initialize_providers(self) -> None:
-        """Initialize STT and TTS providers."""
+    async def _initialize_providers(self) -> None:
+        """Initialize STT, TTS and wake-word providers.
+
+        Each factory honours the configured provider and falls back to one
+        that is actually available, rather than hardcoding a single choice.
+        """
         try:
-            self._stt = WhisperSTT()
+            self._stt = await create_stt_provider()
         except Exception as e:
-            logger.warning(f"Failed to initialize Whisper STT: {e}")
+            logger.warning(f"Failed to initialize STT: {e}")
 
         try:
-            self._tts = PiperTTS()
+            self._tts = await create_tts_provider()
         except Exception as e:
-            logger.warning(f"Failed to initialize Piper TTS: {e}")
+            logger.warning(f"Failed to initialize TTS: {e}")
 
         try:
             self._wake_word = WakeWordDetector()
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Porcupine unavailable: {e}")
             self._wake_word = SimpleWakeWordDetector()
 
     async def start(self, agent_callback: Callable[[str], Any]) -> None:
@@ -54,11 +59,18 @@ class VoicePipeline:
 
         self._running = True
         self._agent_callback = agent_callback
-        self._initialize_providers()
+        await self._initialize_providers()
 
         if self._settings.voice.enabled and self._wake_word:
-            await self._wake_word.start(self._on_wake_word)
-            logger.info("Voice pipeline started with wake word")
+            try:
+                await self._wake_word.start(self._on_wake_word)
+                logger.info("Voice pipeline started with wake word")
+            except Exception as e:
+                # A missing Picovoice key should not take the whole pipeline
+                # down; push-to-talk and the UI still work.
+                logger.warning(f"Wake word unavailable ({e}); voice is in manual mode.")
+                self._wake_word = SimpleWakeWordDetector()
+                await self._wake_word.start(self._on_wake_word)
         else:
             logger.info("Voice pipeline started (manual mode)")
 

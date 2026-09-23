@@ -25,6 +25,11 @@ class AnalyzeScreenTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, question: str = "Describe what you see", **kwargs) -> ToolResult:
+        """Analyze current screen content.
+
+        Args:
+            question: What to determine about what is currently on screen.
+        """
         try:
             from jarvis.desktop.screen_analyzer import ScreenAnalyzer
             analyzer = ScreenAnalyzer()
@@ -53,6 +58,12 @@ class FindElementTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, description: str, **kwargs) -> ToolResult:
+        """Find a UI element on screen.
+
+        Args:
+            description: Plain description of the element to locate, e.g. 'the blue
+                Save button'.
+        """
         try:
             from jarvis.desktop.element_detector import ElementDetector
             detector = ElementDetector()
@@ -89,6 +100,12 @@ class ClickElementTool(BaseTool):
         return ToolRiskLevel.SENSITIVE
 
     async def execute(self, description: str, **kwargs) -> ToolResult:
+        """Click a UI element by description.
+
+        Args:
+            description: Plain description of the on-screen element to click, e.g. 'the
+                Close button'.
+        """
         try:
             from jarvis.desktop.element_detector import ElementDetector
             detector = ElementDetector()
@@ -117,6 +134,11 @@ class SuggestActionsTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, task: str, **kwargs) -> ToolResult:
+        """Suggest actions based on screen state.
+
+        Args:
+            task: What the user is trying to accomplish on the current screen.
+        """
         try:
             from jarvis.desktop.screen_analyzer import ScreenAnalyzer
             analyzer = ScreenAnalyzer()
@@ -145,6 +167,11 @@ class CaptureScreenTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, filename: Optional[str] = None, **kwargs) -> ToolResult:
+        """Capture and save a screenshot.
+
+        Args:
+            filename: Where to save the capture. Omit to keep it in memory only.
+        """
         try:
             from jarvis.desktop.vision import VisionCapture
             capture = VisionCapture()

@@ -30,7 +30,12 @@ class OpenApplicationTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, app_name: str) -> ToolResult:
-        """Open an application."""
+        """Open an application.
+
+        Args:
+            app_name: Application to open: a friendly name ('vscode', 'chrome',
+                'notepad'), an executable name, or a full path.
+        """
         try:
             # Common application mappings
             app_map = {
@@ -84,7 +89,11 @@ class CloseApplicationTool(BaseTool):
         return ToolRiskLevel.SENSITIVE
 
     async def execute(self, app_name: str) -> ToolResult:
-        """Close an application."""
+        """Close an application.
+
+        Args:
+            app_name: Name of the application process to close, without '.exe'.
+        """
         try:
             # Use taskkill
             proc = await asyncio.create_subprocess_exec(
@@ -163,7 +172,11 @@ class FocusWindowTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, title: str) -> ToolResult:
-        """Focus window."""
+        """Focus window.
+
+        Args:
+            title: Full or partial title of the window to bring to the foreground.
+        """
         try:
             from pywinauto import Desktop
 
@@ -199,7 +212,14 @@ class TakeScreenshotTool(BaseTool):
         region: Optional[dict[str, int]] = None,
         save_path: Optional[str] = None,
     ) -> ToolResult:
-        """Take screenshot."""
+        """Take screenshot.
+
+        Args:
+            region: Region to capture as
+                {'left':int,'top':int,'width':int,'height':int}. Omit to capture the
+                whole screen.
+            save_path: Where to write the PNG. Omit to keep it in memory only.
+        """
         try:
             import mss
             from PIL import Image
@@ -254,7 +274,14 @@ class RunCommandTool(BaseTool):
         timeout: int = 60,
         shell: bool = True,
     ) -> ToolResult:
-        """Run command."""
+        """Run command.
+
+        Args:
+            command: The command line to run.
+            cwd: Working directory for the command. Defaults to the current directory.
+            timeout: Seconds to wait before killing the command.
+            shell: Run through the system shell, enabling pipes and redirection.
+        """
         try:
             if shell:
                 proc = await asyncio.create_subprocess_shell(
@@ -313,7 +340,13 @@ class RunPowerShellTool(BaseTool):
         cwd: Optional[str] = None,
         timeout: int = 60,
     ) -> ToolResult:
-        """Run PowerShell command."""
+        """Run PowerShell command.
+
+        Args:
+            command: PowerShell command or script to run.
+            cwd: Working directory for the command. Defaults to the current directory.
+            timeout: Seconds to wait before killing the command.
+        """
         try:
             full_cmd = f'powershell -NoProfile -Command "{command}"'
             return await RunCommandTool().execute(full_cmd, cwd=cwd, timeout=timeout)
@@ -339,7 +372,11 @@ class ListDirectoryTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, path: str = ".") -> ToolResult:
-        """List directory."""
+        """List directory.
+
+        Args:
+            path: Directory to list.
+        """
         try:
             p = Path(path).resolve()
             if not p.exists():
@@ -378,7 +415,12 @@ class CreateFileTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, path: str, content: str = "") -> ToolResult:
-        """Create file."""
+        """Create file.
+
+        Args:
+            path: Path of the file to create, including the filename.
+            content: Initial text content for the file.
+        """
         try:
             p = Path(path)
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -405,7 +447,12 @@ class ReadFileTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, path: str, encoding: str = "utf-8") -> ToolResult:
-        """Read file."""
+        """Read file.
+
+        Args:
+            path: Path of the file to read.
+            encoding: Text encoding to decode with, such as utf-8.
+        """
         try:
             p = Path(path)
             if not p.exists():
@@ -434,7 +481,13 @@ class WriteFileTool(BaseTool):
         return ToolRiskLevel.SENSITIVE
 
     async def execute(self, path: str, content: str, encoding: str = "utf-8") -> ToolResult:
-        """Write file."""
+        """Write file.
+
+        Args:
+            path: Path of the file to write. It is overwritten if it exists.
+            content: Full text content to write.
+            encoding: Text encoding to write with, such as utf-8.
+        """
         try:
             p = Path(path)
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -461,7 +514,11 @@ class CreateDirectoryTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, path: str) -> ToolResult:
-        """Create directory."""
+        """Create directory.
+
+        Args:
+            path: Directory to create, including any missing parents.
+        """
         try:
             p = Path(path)
             p.mkdir(parents=True, exist_ok=True)
@@ -487,7 +544,12 @@ class DeleteFileTool(BaseTool):
         return ToolRiskLevel.DANGEROUS
 
     async def execute(self, path: str, recursive: bool = False) -> ToolResult:
-        """Delete file/directory."""
+        """Delete file/directory.
+
+        Args:
+            path: File or directory to delete.
+            recursive: Required to delete a directory and everything inside it.
+        """
         try:
             p = Path(path)
             if not p.exists():
@@ -528,7 +590,13 @@ class SearchFilesTool(BaseTool):
         root: str = ".",
         max_results: int = 100,
     ) -> ToolResult:
-        """Search files."""
+        """Search files.
+
+        Args:
+            pattern: Filename glob to match, such as '*.py' or 'test_*'.
+            root: Directory to search from, recursively.
+            max_results: Maximum number of matches to return.
+        """
         try:
             root_path = Path(root).resolve()
             results = []
@@ -575,7 +643,14 @@ class ClickMouseTool(BaseTool):
         button: str = "left",
         clicks: int = 1,
     ) -> ToolResult:
-        """Click mouse."""
+        """Click mouse.
+
+        Args:
+            x: Screen x coordinate. Omit to click wherever the cursor already is.
+            y: Screen y coordinate. Omit to click wherever the cursor already is.
+            button: Which button to click: left, right, or middle.
+            clicks: Number of clicks; use 2 for a double-click.
+        """
         try:
             import pyautogui
             pyautogui.FAILSAFE = True
@@ -609,7 +684,13 @@ class MoveMouseTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, x: int, y: int, duration: float = 0.2) -> ToolResult:
-        """Move mouse."""
+        """Move mouse.
+
+        Args:
+            x: Target screen x coordinate.
+            y: Target screen y coordinate.
+            duration: Seconds to spend moving there; 0 jumps instantly.
+        """
         try:
             import pyautogui
             pyautogui.moveTo(x=x, y=y, duration=duration)
@@ -635,7 +716,12 @@ class ScrollMouseTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, amount: int = 300) -> ToolResult:
-        """Scroll mouse."""
+        """Scroll mouse.
+
+        Args:
+            amount: Scroll distance in notches. Positive scrolls up, negative scrolls
+                down.
+        """
         try:
             import pyautogui
             pyautogui.scroll(amount)
@@ -662,7 +748,14 @@ class TypeTextTool(BaseTool):
         return ToolRiskLevel.SENSITIVE
 
     async def execute(self, text: str, press_enter: bool = False, interval: float = 0.02) -> ToolResult:
-        """Type text."""
+        """Type text.
+
+        Args:
+            text: The literal text to type at the current cursor position.
+            press_enter: Press Enter after typing the text.
+            interval: Seconds between keystrokes; raise it for apps that drop fast
+                input.
+        """
         try:
             import pyautogui
             pyautogui.write(text, interval=interval)
@@ -690,7 +783,13 @@ class PressKeyTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, key: str, presses: int = 1) -> ToolResult:
-        """Press key."""
+        """Press key.
+
+        Args:
+            key: Key name to press, such as enter, tab, esc, f5, up, or a single
+                character.
+            presses: How many times to press the key.
+        """
         try:
             import pyautogui
             pyautogui.press(key, presses=presses)
@@ -716,7 +815,11 @@ class HotkeyTool(BaseTool):
         return ToolRiskLevel.SENSITIVE
 
     async def execute(self, keys: list[str]) -> ToolResult:
-        """Execute hotkey."""
+        """Execute hotkey.
+
+        Args:
+            keys: Keys to hold together, in order, e.g. ['ctrl', 'shift', 'esc'].
+        """
         try:
             import pyautogui
             pyautogui.hotkey(*keys)
@@ -742,7 +845,12 @@ class WindowActionTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, title: str, action: str = "minimize") -> ToolResult:
-        """Window action."""
+        """Window action.
+
+        Args:
+            title: Full or partial title of the target window.
+            action: What to do with it: minimize, maximize, restore, or close.
+        """
         try:
             from pywinauto import Desktop
 
@@ -818,7 +926,11 @@ class SetClipboardTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, text: str) -> ToolResult:
-        """Set clipboard."""
+        """Set clipboard.
+
+        Args:
+            text: Text to place on the Windows clipboard.
+        """
         try:
             from PySide6.QtWidgets import QApplication
 
@@ -856,7 +968,12 @@ class ListProcessesTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, limit: int = 15, sort_by: str = "memory") -> ToolResult:
-        """List processes."""
+        """List processes.
+
+        Args:
+            limit: Maximum number of processes to return.
+            sort_by: Sort key: cpu, memory, name, or pid.
+        """
         try:
             import psutil
 

@@ -8,6 +8,9 @@ from jarvis.tools.vision import register_vision_tools
 from jarvis.tools.system import register_system_tools
 from jarvis.tools.memory import register_memory_tools
 from jarvis.agent.tools import get_registry
+from jarvis.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def load_all_tools() -> None:
@@ -37,10 +40,13 @@ def load_all_tools() -> None:
                 break
         tools_by_category.setdefault(cat, []).append(name)
 
-    print(f"Loaded {len(registry._tools)} tools:")
-    for cat, tools in tools_by_category.items():
-        print(f"  {cat}: {', '.join(tools)}")
+    logger.info(f"Loaded {len(registry._tools)} tools")
+    for cat, tools in sorted(tools_by_category.items()):
+        logger.debug(f"  {cat}: {', '.join(sorted(tools))}")
 
 
 if __name__ == "__main__":
     load_all_tools()
+    registry = get_registry()
+    for tool in sorted(registry.get_all(), key=lambda t: t.name):
+        print(f"{tool.name:<24} [{tool.risk_level.value}] {tool.description}")

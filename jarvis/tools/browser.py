@@ -25,6 +25,11 @@ class NavigateTool(BaseTool):
         return ToolRiskLevel.SENSITIVE
 
     async def execute(self, url: str, **kwargs) -> ToolResult:
+        """Navigate to a URL.
+
+        Args:
+            url: Full URL to open, including the scheme.
+        """
         try:
             from jarvis.browser.navigator import Navigator
             navigator = Navigator()
@@ -53,6 +58,11 @@ class ClickElementTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, selector: str, **kwargs) -> ToolResult:
+        """Click an element on the page.
+
+        Args:
+            selector: CSS selector for the element to click.
+        """
         try:
             from jarvis.browser.interactor import Interactor
             interactor = Interactor()
@@ -81,6 +91,12 @@ class TypeTextTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, selector: str, text: str, **kwargs) -> ToolResult:
+        """Type text into an element.
+
+        Args:
+            selector: CSS selector for the input to type into.
+            text: Text to enter into that input.
+        """
         try:
             from jarvis.browser.interactor import Interactor
             interactor = Interactor()
@@ -109,6 +125,11 @@ class GetPageContentTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, selector: Optional[str] = None, **kwargs) -> ToolResult:
+        """Get text content from the page.
+
+        Args:
+            selector: CSS selector to read. Omit to read the whole page.
+        """
         try:
             from jarvis.browser.scraping import Scraper
             scraper = Scraper()
@@ -161,6 +182,11 @@ class ScreenshotTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, path: Optional[str] = None, **kwargs) -> ToolResult:
+        """Take a screenshot of the page.
+
+        Args:
+            path: Where to save the PNG. Omit to keep it in memory only.
+        """
         try:
             from jarvis.browser.interactor import Interactor
             interactor = Interactor()
@@ -187,6 +213,12 @@ class ScrollTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, direction: str = "down", amount: int = 500, **kwargs) -> ToolResult:
+        """Scroll the page.
+
+        Args:
+            direction: Which way to scroll: up or down.
+            amount: Distance to scroll in pixels.
+        """
         try:
             from jarvis.browser.interactor import Interactor
             interactor = Interactor()

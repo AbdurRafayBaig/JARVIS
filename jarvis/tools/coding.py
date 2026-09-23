@@ -35,7 +35,14 @@ class RunPythonTool(BaseTool):
         args: list[str] = None,
         timeout: int = 120,
     ) -> ToolResult:
-        """Run Python."""
+        """Run Python.
+
+        Args:
+            script: Python source to execute.
+            cwd: Working directory to run it in.
+            args: Command-line arguments passed to the script as sys.argv.
+            timeout: Seconds to wait before killing the process.
+        """
         try:
             cmd = ["python", "-c", script]
             if args:
@@ -91,7 +98,14 @@ class RunPythonFileTool(BaseTool):
         args: list[str] = None,
         timeout: int = 120,
     ) -> ToolResult:
-        """Run Python file."""
+        """Run Python file.
+
+        Args:
+            file_path: Path of the .py file to run.
+            cwd: Working directory to run it in.
+            args: Command-line arguments passed to the script.
+            timeout: Seconds to wait before killing the process.
+        """
         try:
             cmd = ["python", file_path]
             if args:
@@ -148,7 +162,15 @@ class RunTestsTool(BaseTool):
         timeout: int = 300,
         extra_args: list[str] = None,
     ) -> ToolResult:
-        """Run tests."""
+        """Run tests.
+
+        Args:
+            path: Directory or test file to run.
+            pattern: Test file pattern to collect, such as 'test_*.py'.
+            cwd: Working directory, normally the project root.
+            timeout: Seconds to wait before killing the run.
+            extra_args: Extra pytest arguments, such as ['-v', '-k', 'auth'].
+        """
         try:
             cmd = ["python", "-m", "pytest", path, "-k", pattern, "-v", "--tb=short"]
             if extra_args:
@@ -215,7 +237,14 @@ class InstallPackageTool(BaseTool):
         index_url: Optional[str] = None,
         timeout: int = 120,
     ) -> ToolResult:
-        """Install package."""
+        """Install package.
+
+        Args:
+            package: Package name to install with pip.
+            version: Exact version to pin. Omit for the latest.
+            index_url: Alternative package index URL.
+            timeout: Seconds to wait before giving up.
+        """
         try:
             cmd = ["python", "-m", "pip", "install"]
             if index_url:
@@ -273,7 +302,13 @@ class GitTool(BaseTool):
         cwd: Optional[str] = None,
         timeout: int = 60,
     ) -> ToolResult:
-        """Run git command."""
+        """Run git command.
+
+        Args:
+            command: Git arguments without the leading 'git', e.g. 'log --oneline -5'.
+            cwd: Repository directory.
+            timeout: Seconds to wait before killing the command.
+        """
         try:
             cmd = ["git"] + command.split()
 
@@ -321,7 +356,11 @@ class GitStatusTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, cwd: Optional[str] = None) -> ToolResult:
-        """Get git status."""
+        """Get git status.
+
+        Args:
+            cwd: Repository directory.
+        """
         return await GitTool().execute("status --porcelain", cwd=cwd)
 
 
@@ -341,7 +380,11 @@ class GitInitTool(BaseTool):
         return ToolRiskLevel.SENSITIVE
 
     async def execute(self, cwd: Optional[str] = None) -> ToolResult:
-        """Init git repo."""
+        """Init git repo.
+
+        Args:
+            cwd: Directory to turn into a git repository.
+        """
         return await GitTool().execute("init", cwd=cwd)
 
 
@@ -361,7 +404,12 @@ class GitAddTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, files: str = ".", cwd: Optional[str] = None) -> ToolResult:
-        """Git add."""
+        """Git add.
+
+        Args:
+            files: Paths to stage, space separated. Use '.' for everything.
+            cwd: Repository directory.
+        """
         return await GitTool().execute(f"add {files}", cwd=cwd)
 
 
@@ -386,7 +434,13 @@ class GitCommitTool(BaseTool):
         cwd: Optional[str] = None,
         author: Optional[str] = None,
     ) -> ToolResult:
-        """Git commit."""
+        """Git commit.
+
+        Args:
+            message: Commit message.
+            cwd: Repository directory.
+            author: Override the commit author, as 'Name <email>'.
+        """
         cmd = f'commit -m "{message}"'
         if author:
             cmd += f' --author="{author}"'
@@ -415,7 +469,14 @@ class GitPushTool(BaseTool):
         force: bool = False,
         cwd: Optional[str] = None,
     ) -> ToolResult:
-        """Git push."""
+        """Git push.
+
+        Args:
+            remote: Remote name, usually 'origin'.
+            branch: Branch to push. Omit to push the current branch.
+            force: Force-push, overwriting remote history. Use with care.
+            cwd: Repository directory.
+        """
         cmd = f"push {remote}"
         if branch:
             cmd += f" {branch}"
@@ -445,7 +506,13 @@ class GitPullTool(BaseTool):
         branch: Optional[str] = None,
         cwd: Optional[str] = None,
     ) -> ToolResult:
-        """Git pull."""
+        """Git pull.
+
+        Args:
+            remote: Remote name, usually 'origin'.
+            branch: Branch to pull. Omit for the current branch's upstream.
+            cwd: Repository directory.
+        """
         cmd = f"pull {remote}"
         if branch:
             cmd += f" {branch}"
@@ -468,7 +535,13 @@ class CreateGitIgnoreTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, project_type: str = "python", cwd: Optional[str] = None) -> ToolResult:
-        """Create gitignore."""
+        """Create gitignore.
+
+        Args:
+            project_type: Project type the ignore rules should target, such as python
+                or node.
+            cwd: Directory to write the .gitignore into.
+        """
         try:
             gitignore_templates = {
                 "python": """# Byte-compiled / optimized / DLL files
@@ -573,7 +646,13 @@ class FileEditTool(BaseTool):
         return ToolRiskLevel.SENSITIVE
 
     async def execute(self, path: str, target: str, replacement: str) -> ToolResult:
-        """Edit file by replacing target string."""
+        """Edit file by replacing target string.
+
+        Args:
+            path: File to edit.
+            target: Exact existing text to replace. It must appear in the file.
+            replacement: Text to put in its place.
+        """
         try:
             p = Path(path).resolve()
             if not p.exists():
@@ -607,7 +686,12 @@ class FileTreeTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, path: str = ".", max_depth: int = 3) -> ToolResult:
-        """Generate file tree."""
+        """Generate file tree.
+
+        Args:
+            path: Directory to render as a tree.
+            max_depth: How many levels deep to descend.
+        """
         try:
             root = Path(path).resolve()
             if not root.exists():
@@ -663,7 +747,14 @@ class GrepSearchTool(BaseTool):
         file_extension: Optional[str] = None,
         max_results: int = 50,
     ) -> ToolResult:
-        """Grep search."""
+        """Grep search.
+
+        Args:
+            query: Text or regular expression to search for.
+            path: Directory to search in, recursively.
+            file_extension: Limit the search to one extension, such as '.py'.
+            max_results: Maximum number of matching lines to return.
+        """
         try:
             import re
             root = Path(path).resolve()
@@ -719,7 +810,11 @@ class AnalyzeCodeErrorTool(BaseTool):
         return ToolRiskLevel.SAFE
 
     async def execute(self, error_text: str) -> ToolResult:
-        """Analyze code error."""
+        """Analyze code error.
+
+        Args:
+            error_text: The full error message or traceback to diagnose.
+        """
         try:
             lines = error_text.strip().splitlines()
             traceback_lines = [l for l in lines if "Error" in l or "Exception" in l or "Traceback" in l or "File " in l]
