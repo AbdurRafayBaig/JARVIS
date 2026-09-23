@@ -1,0 +1,114 @@
+# JARVIS .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/
+*.db-journal
+
+# Test
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Ruff
+.ruff_cache/
+
+# Distribution
+*.tar.gz
+*.whl
+
+# JARVIS Specific
+temp/
+jarvis/temp/
+*.pid
+jarvis.pid
+
+# Playwright
+playwright/
+
+# Cache
+.cache/
+*.cache
+
+# Local config
+local_settings.py
+settings.local.py
+# Local tool / IDE state (machine-specific paths, credential stores)
+.jetro/
+.mcp.json
+.cursor/mcp.json
+
+# Scratch
+*.orig
+*.rej

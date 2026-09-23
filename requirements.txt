@@ -1,0 +1,131 @@
+# ==========================================
+# CORE DEPENDENCIES
+# ==========================================
+python-dotenv>=1.0.0
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+pyyaml>=6.0.1
+
+# ==========================================
+# ASYNC & CONCURRENCY
+# ==========================================
+anyio>=4.3.0
+trio>=0.25.0
+
+# ==========================================
+# LOGGING & MONITORING
+# ==========================================
+loguru>=0.7.2
+rich>=13.7.0
+structlog>=24.1.0
+
+# ==========================================
+# DATABASE
+# ==========================================
+sqlalchemy>=2.0.30
+alembic>=1.13.0
+aiosqlite>=0.20.0
+redis>=5.0.1
+
+# ==========================================
+# LLM PROVIDERS
+# ==========================================
+openai>=1.30.0
+anthropic>=0.39.0
+ollama>=0.3.0
+# llama-cpp-python>=0.2.90  # Optional: enable for local LLM (requires Windows Long Paths)
+
+# ==========================================
+# SPEECH (STT/TTS)
+# ==========================================
+faster-whisper>=1.0.0
+piper-tts>=1.2.0
+pvporcupine>=3.0.0
+pyaudio>=0.2.14
+sounddevice>=0.4.6
+numpy>=1.26.0
+scipy>=1.13.0
+
+# ==========================================
+# COMPUTER VISION & AUTOMATION
+# ==========================================
+opencv-python>=4.9.0
+pillow>=10.3.0
+mss>=9.0.1
+pyautogui>=0.9.54
+pywinauto>=0.6.8
+psutil>=5.9.8
+wmi>=1.5.1
+comtypes>=1.2.0
+
+# ==========================================
+# BROWSER AUTOMATION
+# ==========================================
+playwright>=1.42.0
+beautifulsoup4>=4.12.0
+lxml>=5.2.0
+requests>=2.31.0
+httpx>=0.27.0
+
+# ==========================================
+# FILESYSTEM & CODE
+# ==========================================
+watchdog>=3.0.0
+gitpython>=3.1.40
+dulwich>=0.21.0
+tree-sitter>=0.22.0
+tree-sitter-python>=0.21.0
+tree-sitter-javascript>=0.20.0
+tree-sitter-typescript>=0.20.0
+
+# ==========================================
+# VS CODE INTEGRATION
+# ==========================================
+python-lsp-server>=1.10.0
+
+# ==========================================
+# OFFICE AUTOMATION
+# ==========================================
+python-docx>=1.1.0
+openpyxl>=3.1.2
+python-pptx>=0.6.23
+pypdf>=4.1.0
+pdfplumber>=0.11.0
+
+# ==========================================
+# UI FRAMEWORK
+# ==========================================
+PySide6>=6.7.0
+qasync>=0.26.0
+# qdarktheme>=1.1.0  # Not compatible with Python 3.11
+
+# ==========================================
+# TESTING
+# ==========================================
+pytest>=8.2.0
+pytest-asyncio>=0.23.0
+pytest-cov>=5.0.0
+pytest-mock>=3.12.0
+pytest-xdist>=3.5.0
+hypothesis>=6.99.0
+
+# ==========================================
+# DEVELOPMENT
+# ==========================================
+ruff>=0.4.0
+mypy>=1.10.0
+pre-commit>=3.7.0
+black>=24.3.0
+isort>=5.13.0
+
+# ==========================================
+# UTILITIES
+# ==========================================
+typer>=0.12.0
+click>=8.1.7
+tqdm>=4.66.0
+tenacity>=8.2.0
+python-dateutil>=2.9.0
+croniter>=2.0.0
+cryptography>=42.0.0
+keyring>=25.1.0
