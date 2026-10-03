@@ -111,17 +111,22 @@ JARVIS_PROJECTS_DIR=C:\Projects
 
 ### Project Structure
 ```
+run.py              # Entry point (GUI, --cli, --no-gui, --diagnose)
 jarvis/
-├── core/           # Config, logging, database, exceptions
-├── agent/          # Agent runtime, planner, tools
-├── llm/            # LLM providers (OpenAI, Anthropic, Ollama)
-├── tools/          # Computer, coding, browser, office tools
-├── ui/             # Floating orb, side panel, command center
-├── memory/         # Conversation, project, vector memory
-├── security/       # Approval, permissions, audit
-├── services/       # Startup, hotkeys, notifications
-├── tests/          # Unit, integration, e2e tests
-└── docs/           # Documentation
+├── core/           # Config, logging, database, models, exceptions
+├── agent/          # Agent runtime, planners, tool base classes, step context
+├── llm/            # LLM providers (OpenAI, Azure, Anthropic, Ollama)
+├── tools/          # Tool implementations registered with the agent
+├── browser/        # Playwright engine, navigation, scraping
+├── desktop/        # Screen capture and vision analysis
+├── voice/          # Audio I/O, STT, TTS, wake word, pipeline
+├── memory/         # Conversation, project, vector and task-history stores
+├── security/       # Approval, audit log, sandbox
+├── services/       # Global hotkeys, startup entry, notifications
+├── integrations/   # GitHub API client
+└── ui/             # Orb, side panel, Command Center, Settings
+tests/              # Unit and integration tests
+docs/               # Documentation
 ```
 
 ### Running Tests
@@ -148,20 +153,45 @@ ruff format .
 mypy jarvis
 ```
 
-## Phased Development
+## Status
 
-| Phase | Focus | Status |
-|-------|-------|--------|
-| 1 | Foundation (config, logging, DB, agent core) | ✓ |
-| 2 | Computer Control (apps, mouse, keyboard, windows) | 🔄 |
-| 3 | Voice (wake word, STT, TTS) | ⏳ |
-| 4 | Files + Terminal (fs, PowerShell, Python) | ⏳ |
-| 5 | Coding Agent (workspace, tests, VS Code) | ⏳ |
-| 6 | Browser + GitHub (Playwright, Git, GitHub API) | ⏳ |
-| 7 | Vision (screen capture, UI understanding) | ⏳ |
-| 8 | Memory (conversations, projects, retrieval) | ⏳ |
-| 9 | Command Center (dashboard, timeline, metrics) | ⏳ |
-| 10 | Polish (startup, animations, installer, docs) | ⏳ |
+| Area | State |
+|------|-------|
+| Agent runtime (plan, execute, recover, report) | Working; covered by tests |
+| Tools (65: system, desktop, files, shell, coding, git, browser, GitHub, vision, memory) | Working |
+| Memory (conversation history, projects, preferences, task history) | Working, stored in SQLite |
+| Audit log and approval prompts | Working |
+| GUI (orb, side panel, tray, Command Center, Settings) | Working |
+| Global hotkeys | Working (Windows) |
+| Speech output | Working out of the box via Windows SAPI; Piper optional |
+| Speech input | Push-to-talk works; hands-free wake word needs a Picovoice key |
+| Office automation (Word/Excel/PDF tools) | Not implemented yet |
+| Installer | Not implemented yet |
+
+Planning needs a working LLM. Without one (no key, no credits, provider down)
+JARVIS falls back to a keyword planner that handles simple single-step
+requests and says so when a goal is beyond it.
+
+## Hotkeys
+
+| Keys | Action |
+|------|--------|
+| `Ctrl+Space` | Show / hide the panel |
+| `Ctrl+Shift+J` | Push-to-talk: listen for one spoken request |
+| `Ctrl+Shift+C` | Open the Command Center |
+| `Ctrl+Shift+X` | Cancel the running task |
+
+## Troubleshooting
+
+- **`python run.py --diagnose`** checks every subsystem. `[WARN]` marks an
+  optional feature that is not configured; `[FAIL]` is a real problem.
+- **Answers like "I can't plan ... without my language model"**: the LLM call
+  failed. Check `LLM_API_KEY` and your provider's billing, or run locally with
+  `LLM_PROVIDER=ollama` and `LLM_MODEL=<a model you have pulled>`.
+- **No hands-free wake word**: set `PV_ACCESS_KEY` (free at console.picovoice.ai).
+- Logs are in `%APPDATA%\Jarvis\logs\jarvis.log`.
+
+More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Security
 
@@ -182,19 +212,6 @@ MIT License — see LICENSE file for details.
 3. Make your changes
 4. Run tests and linting
 5. Submit a pull request
-
-## Roadmap
-
-- [ ] Phase 1: Foundation complete
-- [ ] Phase 2: Computer control
-- [ ] Phase 3: Voice integration
-- [ ] Phase 4: Files & terminal
-- [ ] Phase 5: Coding agent
-- [ ] Phase 6: Browser & GitHub
-- [ ] Phase 7: Screen vision
-- [ ] Phase 8: Memory system
-- [ ] Phase 9: Command Center
-- [ ] Phase 10: Polish & release
 
 ---
 
