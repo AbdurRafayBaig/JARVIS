@@ -21,11 +21,19 @@ Agent.execute_task(goal)
 
 ## Planners
 
-- `LLMPlanner` sends the goal, the context and every tool schema to the
-  configured LLM and parses a JSON plan.
-- `SimplePlanner` is the fallback when the LLM call fails. It matches common
-  single-tool requests by keyword and otherwise answers that the language
-  model is needed.
+`HybridPlanner` is the default and tries, in order:
+
+1. **Intent router** (`agent/intent_router.py`): pattern rules for direct
+   computer commands. It splits a goal into clauses and answers only if every
+   clause is recognised, so a partly understood goal is never partly executed.
+   No model is called; replies are composed by `agent/local_summary.py`.
+2. **`LLMPlanner`**: sends the goal, context and tool schemas to the LLM and
+   parses a JSON plan.
+3. **Fallback**: if the LLM call fails, a plain reply that the model is needed.
+   The LLM is then skipped for five minutes so later requests fail fast.
+
+To teach the router a new command, add a rule method to `IntentRouter` and a
+row to `SINGLE_COMMANDS` in `tests/unit/test_intent_router.py`.
 
 ## Passing data between steps
 

@@ -7,6 +7,7 @@ from jarvis.tools.github import register_github_tools
 from jarvis.tools.vision import register_vision_tools
 from jarvis.tools.system import register_system_tools
 from jarvis.tools.memory import register_memory_tools
+from jarvis.tools.windows import register_windows_tools
 from jarvis.agent.tools import get_registry
 from jarvis.core.logging import get_logger
 
@@ -29,6 +30,7 @@ def load_all_tools() -> None:
     register_github_tools()
     register_vision_tools()
     register_memory_tools()
+    register_windows_tools()
 
     # Log loaded tools
     tools_by_category = {}

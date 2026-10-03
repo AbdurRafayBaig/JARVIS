@@ -5,6 +5,7 @@ Generates natural language responses and summaries after task execution.
 
 from typing import Any, Optional
 from jarvis.agent.task import Task, TaskStatus, StepStatus
+from jarvis.agent.local_summary import summarize_locally
 from jarvis.llm.manager import get_llm
 from jarvis.llm.providers import Message
 from jarvis.core.logging import get_logger
@@ -30,18 +31,19 @@ class ResponseGenerator:
                 if isinstance(step.result, str):
                     return step.result
 
+        # A direct command is fully described by what its tools returned;
+        # asking a model to rephrase it would only add latency and a way to fail.
+        if task.metadata.get("plan_source") in ("router", "fallback"):
+            return summarize_locally(task)
+
         if not self.llm:
             try:
                 self.llm = get_llm()
             except Exception:
                 pass
 
-        # Fallback if no LLM available
         if not self.llm:
-            if task.status == TaskStatus.COMPLETED:
-                return f"Task completed successfully: {task.goal}"
-            else:
-                return f"Task failed: {task.error or 'Unknown error'}"
+            return summarize_locally(task)
 
         # Construct prompt for LLM summary
         steps_summary = []
@@ -87,6 +89,4 @@ Provide the final natural response for the user."""
             return resp.content.strip() if resp.content else "Task completed."
         except Exception as e:
             logger.error(f"Response generation failed: {e}")
-            if task.status == TaskStatus.COMPLETED:
-                return f"Done. {task.goal}"
-            return f"Task failed: {task.error or str(e)}"
+            return summarize_locally(task)

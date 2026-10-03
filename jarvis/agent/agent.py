@@ -9,7 +9,7 @@ from typing import Any, Callable, Optional
 
 from jarvis.agent.task import Task, TaskStep, TaskStatus, StepStatus
 from jarvis.agent.tools import ToolRegistry, get_registry, ToolResult, BaseTool
-from jarvis.agent.planner import BasePlanner, SimplePlanner, LLMPlanner
+from jarvis.agent.planner import BasePlanner, SimplePlanner, LLMPlanner, HybridPlanner
 from jarvis.agent.response_generator import ResponseGenerator
 from jarvis.agent.step_context import StepContext, rebuild_context
 from jarvis.llm.manager import get_llm_manager
@@ -84,12 +84,13 @@ class Agent:
         if planner is not None:
             self.planner = planner
         else:
+            llm_planner = None
             try:
                 llm = get_llm_manager().get_provider()
-                self.planner = LLMPlanner(llm, self.tools, max_steps=max_steps)
+                llm_planner = LLMPlanner(llm, self.tools, max_steps=max_steps)
             except Exception as e:
-                logger.warning(f"Could not initialize LLMPlanner ({e}), using SimplePlanner fallback.")
-                self.planner = SimplePlanner(self.tools)
+                logger.warning(f"No LLM available ({e}); direct commands only.")
+            self.planner = HybridPlanner(llm_planner, self.tools)
 
         self.approval_callback = approval_callback
         self.verification_callback = verification_callback
@@ -189,6 +190,7 @@ class Agent:
             plan = await self.planner.plan(goal, context)
             task.steps = plan.steps
             task.metadata["reasoning"] = plan.reasoning
+            task.metadata["plan_source"] = getattr(plan, "source", "llm")
 
             logger.info(f"Plan created with {len(plan.steps)} steps: {plan.reasoning}")
 

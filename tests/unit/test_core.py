@@ -302,14 +302,10 @@ class TestComputerTools:
         """Test open application tool (mocked)."""
         tool = OpenApplicationTool()
 
-        with patch('asyncio.create_subprocess_exec') as mock_exec:
-            mock_proc = AsyncMock()
-            mock_proc.communicate = AsyncMock(return_value=(b"", b""))
-            mock_exec.return_value = mock_proc
-
+        with patch("jarvis.tools.windows.launch_application", return_value="notepad") as mock_launch:
             result = await tool.execute(app_name="notepad")
             assert result.success is True
-            mock_exec.assert_called_once()
+            mock_launch.assert_called_once_with("notepad")
 
 
 class TestCodingTools:

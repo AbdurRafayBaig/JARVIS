@@ -158,7 +158,8 @@ mypy jarvis
 | Area | State |
 |------|-------|
 | Agent runtime (plan, execute, recover, report) | Working; covered by tests |
-| Tools (65: system, desktop, files, shell, coding, git, browser, GitHub, vision, memory) | Working |
+| Tools (81: system, desktop, Windows control, files, shell, coding, git, browser, GitHub, vision, memory) | Working |
+| Direct commands without an LLM (apps, settings, files, volume, windows, ...) | Working; verified live |
 | Memory (conversation history, projects, preferences, task history) | Working, stored in SQLite |
 | Audit log and approval prompts | Working |
 | GUI (orb, side panel, tray, Command Center, Settings) | Working |
@@ -168,9 +169,39 @@ mypy jarvis
 | Office automation (Word/Excel/PDF tools) | Not implemented yet |
 | Installer | Not implemented yet |
 
-Planning needs a working LLM. Without one (no key, no credits, provider down)
-JARVIS falls back to a keyword planner that handles simple single-step
-requests and says so when a goal is beyond it.
+Open-ended goals ("build an API and push it to GitHub") need a working LLM.
+Without one, direct commands (below) still work and anything else is answered
+with a plain "I need my language model for that".
+
+## Direct commands (no LLM needed)
+
+Everyday computer commands are recognised locally and run instantly, with no
+API call. They work even when the language model is unavailable.
+
+| Say or type | What happens |
+|-------------|--------------|
+| `open chrome` / `notepad kholo` / `close calculator` | Start or close an app |
+| `open display settings`, `wifi settings`, `bluetooth settings` | Open that Settings page |
+| `open downloads`, `open report.pdf in documents` | Open a folder or file |
+| `open youtube`, `open github.com`, `search for ...`, `play ... on youtube` | Websites and web search |
+| `create a folder called Work on the desktop` | New folder (Desktop when no place is named) |
+| `create a file called todo with text buy milk` | New text file |
+| `rename a.txt on desktop to b`, `move b.txt from desktop to documents`, `copy ...` | Rename, move, copy |
+| `delete b.txt from documents` | Sends it to the Recycle Bin |
+| `what's in my downloads`, `find resume in documents` | List and find files |
+| `volume up`, `volume down by 20`, `set volume to 40`, `mute` | Volume |
+| `brightness up`, `set brightness to 70` | Brightness (laptop displays) |
+| `pause`, `next song`, `previous song` | Media keys |
+| `dark mode`, `light mode` | Windows colour mode |
+| `minimize notepad`, `switch to chrome`, `show desktop` | Windows |
+| `type hello`, `press enter`, `press ctrl+shift+esc`, `copy`, `paste` | Keyboard |
+| `take a screenshot` | Saved to Pictures\Screenshots |
+| `lock the computer`, `shut down`, `restart`, `sleep`, `cancel shutdown` | Power (shutdown asks first, waits 30s) |
+| `what time is it`, `battery`, `system info` | Status |
+
+Commands chain with "and" / "then": `open notepad and type hello`. Changing or
+removing files, closing apps and power actions ask for approval first. Anything
+the router does not fully understand is passed to the language model instead.
 
 ## Hotkeys
 

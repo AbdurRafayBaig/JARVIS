@@ -10,6 +10,7 @@ from typing import Any, Optional
 from jarvis.agent.tools import BaseTool, ToolResult, ToolRiskLevel, register_tool
 from jarvis.core.logging import get_logger
 from jarvis.core.config import get_settings
+from jarvis.tools.paths import resolve_path
 
 logger = get_logger(__name__)
 
@@ -37,35 +38,14 @@ class OpenApplicationTool(BaseTool):
                 'notepad'), an executable name, or a full path.
         """
         try:
-            # Common application mappings
-            app_map = {
-                "vscode": "code",
-                "visual studio code": "code",
-                "chrome": "chrome",
-                "google chrome": "chrome",
-                "firefox": "firefox",
-                "edge": "msedge",
-                "notepad": "notepad",
-                "terminal": "wt",
-                "windows terminal": "wt",
-                "powershell": "powershell",
-                "cmd": "cmd",
-                "explorer": "explorer",
-                "file explorer": "explorer",
-                "settings": "ms-settings:",
-                "calculator": "calc",
-                "paint": "mspaint",
-                "word": "winword",
-                "excel": "excel",
-                "powerpoint": "powerpnt",
-            }
+            # The launcher resolves aliases, PATH, registered App Paths,
+            # Start Menu shortcuts and Store apps; it blocks briefly, so run
+            # it off the event loop.
+            from jarvis.tools.windows import launch_application
 
-            cmd = app_map.get(app_name.lower(), app_name)
-
-            if cmd == "ms-settings:":
-                await asyncio.create_subprocess_exec("start", cmd, shell=True)
-            else:
-                await asyncio.create_subprocess_exec(cmd)
+            await asyncio.get_running_loop().run_in_executor(
+                None, launch_application, app_name
+            )
 
             return ToolResult(success=True, data=f"Opened {app_name}")
         except Exception as e:
@@ -95,9 +75,16 @@ class CloseApplicationTool(BaseTool):
             app_name: Name of the application process to close, without '.exe'.
         """
         try:
-            # Use taskkill
+            from jarvis.tools.windows import PROCESS_NAMES
+
+            image = PROCESS_NAMES.get(app_name.strip().lower(), app_name.strip())
+            if image.lower().endswith(".exe"):
+                image = image[:-4]
+
+            # No /F: the app is asked to close, so it can still prompt to save
+            # unsaved work instead of losing it.
             proc = await asyncio.create_subprocess_exec(
-                "taskkill", "/IM", f"{app_name}.exe", "/F",
+                "taskkill", "/IM", f"{image}.exe",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -106,7 +93,10 @@ class CloseApplicationTool(BaseTool):
             if proc.returncode == 0:
                 return ToolResult(success=True, data=f"Closed {app_name}")
             else:
-                return ToolResult(success=False, error=stderr.decode())
+                return ToolResult(
+                    success=False,
+                    error=stderr.decode(errors="replace").strip() or f"{app_name} is not running",
+                )
         except Exception as e:
             logger.error(f"Failed to close {app_name}: {e}")
             return ToolResult(success=False, error=str(e))
@@ -239,7 +229,7 @@ class TakeScreenshotTool(BaseTool):
                 img = Image.frombytes("RGB", screenshot.size, screenshot.rgb)
 
                 if save_path:
-                    path = Path(save_path)
+                    path = resolve_path(save_path)
                 else:
                     path = get_settings().get_temp_dir() / f"screenshot_{asyncio.current_task().get_name()}.png"
 
@@ -378,7 +368,7 @@ class ListDirectoryTool(BaseTool):
             path: Directory to list.
         """
         try:
-            p = Path(path).resolve()
+            p = resolve_path(path).resolve()
             if not p.exists():
                 return ToolResult(success=False, error=f"Path not found: {path}")
 
@@ -422,7 +412,7 @@ class CreateFileTool(BaseTool):
             content: Initial text content for the file.
         """
         try:
-            p = Path(path)
+            p = resolve_path(path)
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content, encoding="utf-8")
             return ToolResult(success=True, data={"path": str(p), "size": len(content)})
@@ -454,7 +444,7 @@ class ReadFileTool(BaseTool):
             encoding: Text encoding to decode with, such as utf-8.
         """
         try:
-            p = Path(path)
+            p = resolve_path(path)
             if not p.exists():
                 return ToolResult(success=False, error=f"File not found: {path}")
 
@@ -489,7 +479,7 @@ class WriteFileTool(BaseTool):
             encoding: Text encoding to write with, such as utf-8.
         """
         try:
-            p = Path(path)
+            p = resolve_path(path)
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content, encoding=encoding)
             return ToolResult(success=True, data={"path": str(p), "size": len(content)})
@@ -520,7 +510,7 @@ class CreateDirectoryTool(BaseTool):
             path: Directory to create, including any missing parents.
         """
         try:
-            p = Path(path)
+            p = resolve_path(path)
             p.mkdir(parents=True, exist_ok=True)
             return ToolResult(success=True, data={"path": str(p)})
         except Exception as e:
@@ -551,7 +541,7 @@ class DeleteFileTool(BaseTool):
             recursive: Required to delete a directory and everything inside it.
         """
         try:
-            p = Path(path)
+            p = resolve_path(path)
             if not p.exists():
                 return ToolResult(success=False, error=f"Path not found: {path}")
 
@@ -598,7 +588,7 @@ class SearchFilesTool(BaseTool):
             max_results: Maximum number of matches to return.
         """
         try:
-            root_path = Path(root).resolve()
+            root_path = resolve_path(root).resolve()
             results = []
 
             for path in root_path.rglob(pattern):

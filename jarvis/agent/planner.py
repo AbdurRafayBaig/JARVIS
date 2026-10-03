@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -18,6 +19,9 @@ class Plan:
     steps: list[TaskStep]
     reasoning: str = ""
     estimated_duration: float = 0.0
+    # Who produced the plan: "llm", "router" (direct command, no model used)
+    # or "fallback" (the model was needed but unavailable).
+    source: str = "llm"
 
 
 class BasePlanner(ABC):
@@ -42,10 +46,12 @@ class LLMPlanner(BasePlanner):
         llm_client: Any,
         tool_registry: Optional[ToolRegistry] = None,
         max_steps: int = 30,
+        fallback_to_simple: bool = True,
     ):
         self.llm = llm_client
         self.tools = tool_registry or get_registry()
         self.max_steps = max_steps
+        self.fallback_to_simple = fallback_to_simple
 
     def _build_system_prompt(self) -> str:
         """Build system prompt with available tools."""
@@ -151,6 +157,8 @@ Create a plan to achieve this goal."""
             )
 
         except Exception as e:
+            if not self.fallback_to_simple:
+                raise
             logger.error(f"LLM planning failed: {e}. Falling back to SimplePlanner.")
             try:
                 fallback_planner = SimplePlanner(self.tools)
@@ -186,127 +194,126 @@ Create a plan to achieve this goal."""
 
 
 class SimplePlanner(BasePlanner):
-    """Rule-based planner used when no LLM is available.
+    """Planner that needs no language model.
 
-    This is the degraded path -- it runs when the LLM provider is
-    unreachable, out of quota, or unconfigured. It cannot decompose a goal,
-    but it can recognise common single-tool requests so that JARVIS still
-    does something useful rather than only echoing the request back.
+    Direct computer commands are recognised by the intent router. Anything
+    else gets a plain answer that the language model is required, rather
+    than a pretend acknowledgement.
     """
-
-    # Each rule is (required keywords, any-of keywords, tool, argument builder).
-    # The first rule whose keywords all appear in the goal wins.
-    _RULES: list[tuple[list[str], list[str], str]] = [
-        (["time"], ["what", "current", "tell", "now"], "get_current_time"),
-        (["date"], ["what", "current", "tell", "today"], "get_current_time"),
-        (["system"], ["info", "spec", "status"], "get_system_info"),
-        (["cpu"], [], "get_system_info"),
-        (["memory"], ["usage", "ram", "much"], "get_system_info"),
-        (["screenshot"], [], "take_screenshot"),
-        (["screen"], ["capture", "shot", "grab"], "take_screenshot"),
-        (["window"], ["list", "open", "which", "show"], "list_windows"),
-        (["process"], ["list", "running", "show", "which"], "list_processes"),
-        (["clipboard"], ["read", "get", "what"], "get_clipboard"),
-        (["test"], ["run", "execute"], "run_tests"),
-        (["pytest"], [], "run_tests"),
-        (["git"], ["status"], "git_status"),
-        (["project"], ["list", "show", "which"], "list_projects"),
-    ]
-
-    # Applications recognised by name in an "open X" request.
-    _APPS = {
-        "vs code": "Visual Studio Code",
-        "vscode": "Visual Studio Code",
-        "visual studio code": "Visual Studio Code",
-        "notepad": "Notepad",
-        "chrome": "Chrome",
-        "edge": "Edge",
-        "firefox": "Firefox",
-        "explorer": "File Explorer",
-        "calculator": "Calculator",
-        "terminal": "Windows Terminal",
-        "powershell": "PowerShell",
-        "cmd": "Command Prompt",
-        "spotify": "Spotify",
-        "word": "Word",
-        "excel": "Excel",
-    }
 
     def __init__(self, tool_registry: Optional[ToolRegistry] = None):
         self.tools = tool_registry or get_registry()
 
-    def _step(self, description: str, tool_name: str, **args) -> TaskStep:
-        """Build a step. A tool missing from the registry is reported by the
-        agent when the step runs, so planning does not depend on it."""
-        tool = self.tools.get(tool_name)
-        return TaskStep(
-            description=description,
-            tool_name=tool_name,
-            tool_args=args,
-            requires_approval=tool.requires_approval if tool else False,
-        )
+    def _mark_approvals(self, steps: list[TaskStep]) -> list[TaskStep]:
+        """Carry each tool's approval requirement onto its step."""
+        for step in steps:
+            tool = self.tools.get(step.tool_name)
+            step.requires_approval = tool.requires_approval if tool else False
+        return steps
 
-    def _match_application(self, goal: str) -> Optional[str]:
-        """Find a known application named in an 'open ...' request."""
-        for keyword, app in self._APPS.items():
-            if keyword in goal:
-                return app
-        return None
+    def route(self, goal: str) -> Optional[Plan]:
+        """Plan for a direct command, or None when the goal is not one."""
+        from jarvis.agent.intent_router import get_intent_router
+
+        steps = get_intent_router().route(goal)
+        if not steps:
+            return None
+        return Plan(
+            steps=self._mark_approvals(steps),
+            reasoning="Direct command",
+            estimated_duration=5.0 * len(steps),
+            source="router",
+        )
 
     async def plan(self, goal: str, context: dict[str, Any]) -> Plan:
-        """Create a plan by matching the goal against known request shapes."""
-        goal_lower = goal.lower()
-        step: Optional[TaskStep] = None
-        reasoning = "Keyword-matched plan (no LLM available)"
+        """Plan a direct command, or explain that the model is needed."""
+        routed = self.route(goal)
+        if routed is not None:
+            return routed
 
-        # "open <application>"
-        if any(word in goal_lower for word in ("open", "launch", "start", "run")):
-            app = self._match_application(goal_lower)
-            if app:
-                step = self._step(f"Open {app}", "open_application", app_name=app)
-
-        # Single-tool keyword rules
-        if step is None:
-            for required, any_of, tool_name in self._RULES:
-                if not all(word in goal_lower for word in required):
-                    continue
-                if any_of and not any(word in goal_lower for word in any_of):
-                    continue
-                step = self._step(f"Run {tool_name}", tool_name)
-                if step is not None:
-                    break
-
-        if step is not None:
-            return Plan(steps=[step], reasoning=reasoning, estimated_duration=10.0)
-
-        # Nothing matched: say so plainly rather than implying work was done.
-        fallback = self._step(
-            "Explain that the request needs the language model",
-            "respond",
-            message=(
-                f"I can't plan \"{goal}\" without my language model, which is "
-                f"currently unavailable. Check LLM_API_KEY and the provider's "
-                f"status, or set LLM_PROVIDER=ollama to run locally."
-            ),
+        message = (
+            f'I can\'t work out how to do "{goal}" without my language model, which '
+            f"is unavailable right now. Check LLM_API_KEY and your provider\'s billing, "
+            f"or set LLM_PROVIDER=ollama to run locally. Direct commands still work - "
+            f'say "help" to see them.'
         )
-        steps = [fallback] if fallback else []
         return Plan(
-            steps=steps,
-            reasoning="No keyword rule matched and no LLM is available",
+            steps=[TaskStep(
+                description="Explain that the request needs the language model",
+                tool_name="respond",
+                tool_args={"message": message},
+            )],
+            reasoning="Not a direct command and no LLM is available",
             estimated_duration=1.0,
+            source="fallback",
         )
 
     async def replan(self, task: Task, failed_step: TaskStep, error: str) -> Plan:
         """Retry the failed step once; there is no smarter recovery here."""
-        if failed_step.retry_count < 1:
+        if failed_step.retry_count <= 1 and failed_step.tool_name != "respond":
+            remaining = task.steps[task.current_step_index + 1:]
+            retry = TaskStep(
+                description=failed_step.description,
+                tool_name=failed_step.tool_name,
+                tool_args=failed_step.tool_args,
+                requires_approval=False if failed_step.approved else failed_step.requires_approval,
+            )
             return Plan(
-                steps=[TaskStep(
-                    description=f"Retry: {failed_step.description}",
-                    tool_name=failed_step.tool_name,
-                    tool_args=failed_step.tool_args,
-                    requires_approval=failed_step.requires_approval,
-                )],
+                steps=[retry] + remaining,
                 reasoning="Retrying failed step",
                 estimated_duration=10.0,
+                source="router",
             )
-        return Plan(steps=[], reasoning="Max retries exceeded")
+        return Plan(steps=[], reasoning="Max retries exceeded", source="router")
+
+
+class HybridPlanner(BasePlanner):
+    """Direct commands first, the language model for everything else.
+
+    "Open chrome" should not cost an API call or wait on one. The intent
+    router answers such commands instantly; goals it does not fully
+    understand go to the LLM. When the LLM fails (no credits, no network),
+    it is left alone for a while so later requests fail fast instead of
+    each waiting through the same retries.
+    """
+
+    LLM_COOLDOWN_SECONDS = 300
+
+    def __init__(self, llm_planner: Optional[LLMPlanner], tool_registry: Optional[ToolRegistry] = None):
+        self.llm_planner = llm_planner
+        if llm_planner is not None:
+            llm_planner.fallback_to_simple = False
+        self.simple = SimplePlanner(tool_registry)
+        self._llm_down_until = 0.0
+
+    @property
+    def llm_available(self) -> bool:
+        return self.llm_planner is not None and time.monotonic() >= self._llm_down_until
+
+    def _mark_llm_down(self) -> None:
+        self._llm_down_until = time.monotonic() + self.LLM_COOLDOWN_SECONDS
+
+    async def plan(self, goal: str, context: dict[str, Any]) -> Plan:
+        routed = self.simple.route(goal)
+        if routed is not None:
+            return routed
+
+        if self.llm_available:
+            try:
+                return await self.llm_planner.plan(goal, context)
+            except Exception as e:
+                logger.error(f"LLM planning failed: {e}")
+                self._mark_llm_down()
+
+        return await self.simple.plan(goal, context)
+
+    async def replan(self, task: Task, failed_step: TaskStep, error: str) -> Plan:
+        if task.metadata.get("plan_source") == "llm" and self.llm_available:
+            try:
+                return await self.llm_planner.replan(task, failed_step, error)
+            except Exception as e:
+                logger.error(f"LLM replanning failed: {e}")
+                self._mark_llm_down()
+                return Plan(steps=[], reasoning="LLM unavailable for recovery")
+
+        return await self.simple.replan(task, failed_step, error)
