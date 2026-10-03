@@ -186,55 +186,118 @@ Create a plan to achieve this goal."""
 
 
 class SimplePlanner(BasePlanner):
-    """Simple rule-based planner for basic tasks."""
+    """Rule-based planner used when no LLM is available.
+
+    This is the degraded path -- it runs when the LLM provider is
+    unreachable, out of quota, or unconfigured. It cannot decompose a goal,
+    but it can recognise common single-tool requests so that JARVIS still
+    does something useful rather than only echoing the request back.
+    """
+
+    # Each rule is (required keywords, any-of keywords, tool, argument builder).
+    # The first rule whose keywords all appear in the goal wins.
+    _RULES: list[tuple[list[str], list[str], str]] = [
+        (["time"], ["what", "current", "tell", "now"], "get_current_time"),
+        (["date"], ["what", "current", "tell", "today"], "get_current_time"),
+        (["system"], ["info", "spec", "status"], "get_system_info"),
+        (["cpu"], [], "get_system_info"),
+        (["memory"], ["usage", "ram", "much"], "get_system_info"),
+        (["screenshot"], [], "take_screenshot"),
+        (["screen"], ["capture", "shot", "grab"], "take_screenshot"),
+        (["window"], ["list", "open", "which", "show"], "list_windows"),
+        (["process"], ["list", "running", "show", "which"], "list_processes"),
+        (["clipboard"], ["read", "get", "what"], "get_clipboard"),
+        (["test"], ["run", "execute"], "run_tests"),
+        (["pytest"], [], "run_tests"),
+        (["git"], ["status"], "git_status"),
+        (["project"], ["list", "show", "which"], "list_projects"),
+    ]
+
+    # Applications recognised by name in an "open X" request.
+    _APPS = {
+        "vs code": "Visual Studio Code",
+        "vscode": "Visual Studio Code",
+        "visual studio code": "Visual Studio Code",
+        "notepad": "Notepad",
+        "chrome": "Chrome",
+        "edge": "Edge",
+        "firefox": "Firefox",
+        "explorer": "File Explorer",
+        "calculator": "Calculator",
+        "terminal": "Windows Terminal",
+        "powershell": "PowerShell",
+        "cmd": "Command Prompt",
+        "spotify": "Spotify",
+        "word": "Word",
+        "excel": "Excel",
+    }
 
     def __init__(self, tool_registry: Optional[ToolRegistry] = None):
         self.tools = tool_registry or get_registry()
 
+    def _step(self, description: str, tool_name: str, **args) -> TaskStep:
+        """Build a step. A tool missing from the registry is reported by the
+        agent when the step runs, so planning does not depend on it."""
+        tool = self.tools.get(tool_name)
+        return TaskStep(
+            description=description,
+            tool_name=tool_name,
+            tool_args=args,
+            requires_approval=tool.requires_approval if tool else False,
+        )
+
+    def _match_application(self, goal: str) -> Optional[str]:
+        """Find a known application named in an 'open ...' request."""
+        for keyword, app in self._APPS.items():
+            if keyword in goal:
+                return app
+        return None
+
     async def plan(self, goal: str, context: dict[str, Any]) -> Plan:
-        """Create a simple plan based on keywords."""
+        """Create a plan by matching the goal against known request shapes."""
         goal_lower = goal.lower()
-        steps = []
+        step: Optional[TaskStep] = None
+        reasoning = "Keyword-matched plan (no LLM available)"
 
-        # Simple keyword-based planning
-        if "open" in goal_lower and ("vscode" in goal_lower or "visual studio" in goal_lower):
-            steps.append(TaskStep(
-                description="Open Visual Studio Code",
-                tool_name="open_application",
-                tool_args={"app_name": "Visual Studio Code"},
-            ))
+        # "open <application>"
+        if any(word in goal_lower for word in ("open", "launch", "start", "run")):
+            app = self._match_application(goal_lower)
+            if app:
+                step = self._step(f"Open {app}", "open_application", app_name=app)
 
-        elif "create" in goal_lower and ("folder" in goal_lower or "directory" in goal_lower):
-            # Extract folder name - simplified
-            steps.append(TaskStep(
-                description="Create directory",
-                tool_name="create_directory",
-                tool_args={"path": "NewFolder"},
-            ))
+        # Single-tool keyword rules
+        if step is None:
+            for required, any_of, tool_name in self._RULES:
+                if not all(word in goal_lower for word in required):
+                    continue
+                if any_of and not any(word in goal_lower for word in any_of):
+                    continue
+                step = self._step(f"Run {tool_name}", tool_name)
+                if step is not None:
+                    break
 
-        elif "run" in goal_lower and ("test" in goal_lower or "pytest" in goal_lower):
-            steps.append(TaskStep(
-                description="Run tests",
-                tool_name="run_tests",
-                tool_args={},
-            ))
+        if step is not None:
+            return Plan(steps=[step], reasoning=reasoning, estimated_duration=10.0)
 
-        if not steps:
-            # Default: just acknowledge
-            steps.append(TaskStep(
-                description="Acknowledge request",
-                tool_name="respond",
-                tool_args={"message": f"I'll help with: {goal}"},
-            ))
-
+        # Nothing matched: say so plainly rather than implying work was done.
+        fallback = self._step(
+            "Explain that the request needs the language model",
+            "respond",
+            message=(
+                f"I can't plan \"{goal}\" without my language model, which is "
+                f"currently unavailable. Check LLM_API_KEY and the provider's "
+                f"status, or set LLM_PROVIDER=ollama to run locally."
+            ),
+        )
+        steps = [fallback] if fallback else []
         return Plan(
             steps=steps,
-            reasoning="Simple keyword-based plan",
-            estimated_duration=30.0,
+            reasoning="No keyword rule matched and no LLM is available",
+            estimated_duration=1.0,
         )
 
     async def replan(self, task: Task, failed_step: TaskStep, error: str) -> Plan:
-        """Simple replan - just retry once."""
+        """Retry the failed step once; there is no smarter recovery here."""
         if failed_step.retry_count < 1:
             return Plan(
                 steps=[TaskStep(

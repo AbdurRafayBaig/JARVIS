@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -49,27 +49,27 @@ class TTSSettings(BaseSettings):
 class VoiceSettings(BaseSettings):
     """Voice System Configuration"""
 
-    model_config = SettingsConfigDict(env_prefix="", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="", extra="ignore", populate_by_name=True)
 
-    enabled: bool = Field(default=True, description="Enable voice system")
-    wake_word: str = Field(default="jarvis", description="Wake word")
+    enabled: bool = Field(default=True, validation_alias=AliasChoices("VOICE_ENABLED"), description="Enable voice system")
+    wake_word: str = Field(default="jarvis", validation_alias=AliasChoices("JARVIS_WAKE_WORD", "WAKE_WORD"), description="Wake word")
     wake_word_sensitivity: float = Field(default=0.5, ge=0.0, le=1.0, description="Wake word detection sensitivity")
     microphone_device_index: int = Field(default=0, description="Microphone device index")
     speaker_device_index: int = Field(default=0, description="Speaker device index")
-    volume: float = Field(default=0.8, ge=0.0, le=1.0, description="Output volume")
+    volume: float = Field(default=0.8, ge=0.0, le=1.0, validation_alias=AliasChoices("VOICE_VOLUME", "VOLUME"), description="Output volume")
     speech_speed: float = Field(default=1.0, ge=0.5, le=2.0, description="Speech speed multiplier")
-    silence_timeout: float = Field(default=5.0, gt=0, description="Silence timeout in seconds")
+    silence_timeout: float = Field(default=5.0, gt=0, validation_alias=AliasChoices("SILENCE_TIMEOUT_SECONDS", "SILENCE_TIMEOUT"), description="Silence timeout in seconds")
     pv_access_key: str = Field(default="", description="Picovoice Access Key for Porcupine wake word")
 
 
 class AgentSettings(BaseSettings):
     """Agent Runtime Configuration"""
 
-    model_config = SettingsConfigDict(env_prefix="", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="", extra="ignore", populate_by_name=True)
 
-    max_steps: int = Field(default=30, gt=0, description="Maximum agent steps per task")
+    max_steps: int = Field(default=30, gt=0, validation_alias=AliasChoices("MAX_AGENT_STEPS", "MAX_STEPS"), description="Maximum agent steps per task")
     max_retries: int = Field(default=3, ge=0, description="Maximum retries for failed steps")
-    timeout_seconds: int = Field(default=300, gt=0, description="Task timeout in seconds")
+    timeout_seconds: int = Field(default=300, gt=0, validation_alias=AliasChoices("AGENT_TIMEOUT_SECONDS", "TIMEOUT_SECONDS"), description="Task timeout in seconds")
     enable_verification: bool = Field(default=True, description="Enable self-verification")
     enable_recovery: bool = Field(default=True, description="Enable error recovery")
 
@@ -77,7 +77,7 @@ class AgentSettings(BaseSettings):
 class SecuritySettings(BaseSettings):
     """Security & Permissions Configuration"""
 
-    model_config = SettingsConfigDict(env_prefix="", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="", extra="ignore", populate_by_name=True)
 
     require_confirmation_sensitive: bool = Field(default=True, description="Require confirmation for sensitive actions")
     require_confirmation_dangerous: bool = Field(default=True, description="Require confirmation for dangerous actions")
@@ -88,7 +88,7 @@ class SecuritySettings(BaseSettings):
 class UISettings(BaseSettings):
     """UI Configuration"""
 
-    model_config = SettingsConfigDict(env_prefix="", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="", extra="ignore", populate_by_name=True)
 
     auto_start: bool = Field(default=True, description="Start automatically on login")
     start_minimized: bool = Field(default=False, description="Start minimized to tray")
@@ -139,9 +139,9 @@ class LoggingSettings(BaseSettings):
 class DiagnosticsSettings(BaseSettings):
     """Diagnostics Configuration"""
 
-    model_config = SettingsConfigDict(env_prefix="", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="", extra="ignore", populate_by_name=True)
 
-    enabled: bool = Field(default=True, description="Enable diagnostics")
+    enabled: bool = Field(default=True, validation_alias=AliasChoices("DIAGNOSTICS_ENABLED"), description="Enable diagnostics")
     telemetry_enabled: bool = Field(default=False, description="Enable anonymous telemetry")
 
 
@@ -205,10 +205,18 @@ class Settings(BaseSettings):
         return self.get_data_dir() / "jarvis.db"
 
 
+def get_env_path() -> Path:
+    """Path of the project's .env file."""
+    return Path(__file__).resolve().parent.parent.parent / ".env"
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env", override=False)
+    custom = os.environ.get("JARVIS_CONFIG")
+    if custom and Path(custom).is_file():
+        load_dotenv(custom, override=True)
+    load_dotenv(get_env_path(), override=False)
     return Settings()
 
 

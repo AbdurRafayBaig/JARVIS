@@ -339,3 +339,47 @@ async def test_project_metadata_is_stored(temp_db):
     project = await memory.get_project_by_path("C:/demo")
     assert project is not None
     assert project.task_metadata == {"language": "python"}
+
+
+# -- fallback planner -------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_simple_planner_matches_common_requests():
+    """SimplePlanner is the no-LLM path; it must handle basic requests."""
+    from jarvis.tools.registry_loader import load_all_tools
+    from jarvis.agent.planner import SimplePlanner
+
+    load_all_tools()
+    planner = SimplePlanner()
+
+    expected = {
+        "what is the current time?": "get_current_time",
+        "open vs code": "open_application",
+        "take a screenshot": "take_screenshot",
+        "show me system info": "get_system_info",
+        "list open windows": "list_windows",
+        "run the tests": "run_tests",
+        "git status": "git_status",
+    }
+
+    for goal, tool_name in expected.items():
+        plan = await planner.plan(goal, {})
+        assert plan.steps, f"no plan for {goal!r}"
+        assert plan.steps[0].tool_name == tool_name, goal
+
+
+@pytest.mark.asyncio
+async def test_simple_planner_admits_when_it_cannot_help():
+    """An unmatched goal must say the LLM is needed, not imply success."""
+    from jarvis.tools.registry_loader import load_all_tools
+    from jarvis.agent.planner import SimplePlanner
+
+    load_all_tools()
+    planner = SimplePlanner()
+
+    plan = await planner.plan("design a distributed consensus protocol", {})
+
+    assert len(plan.steps) == 1
+    assert plan.steps[0].tool_name == "respond"
+    assert "language model" in plan.steps[0].tool_args["message"]

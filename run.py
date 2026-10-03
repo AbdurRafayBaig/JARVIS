@@ -117,7 +117,7 @@ class JarvisApplication:
         """Register and start the global hotkeys used by the GUI."""
         bindings = [
             (HOTKEY_TOGGLE_PANEL, self._toggle_panel, "Toggle JARVIS panel"),
-            (HOTKEY_TOGGLE_VOICE, self._toggle_voice, "Toggle voice listening"),
+            (HOTKEY_TOGGLE_VOICE, self._toggle_voice, "Push to talk"),
             (HOTKEY_COMMAND_CENTER, self._open_command_center, "Open Command Center"),
             (HOTKEY_CANCEL_TASK, self._cancel_task, "Cancel the running task"),
         ]
@@ -132,17 +132,6 @@ class JarvisApplication:
             f"{HOTKEY_TOGGLE_VOICE} voice, {HOTKEY_COMMAND_CENTER} command center, "
             f"{HOTKEY_CANCEL_TASK} cancel"
         )
-
-    async def apply_autostart_preference(self) -> None:
-        """Keep the Windows startup entry in sync with the configured setting."""
-        try:
-            enabled = await self._startup_service.is_enabled()
-            if self.settings.ui.auto_start and not enabled:
-                await self._startup_service.enable()
-            elif not self.settings.ui.auto_start and enabled:
-                await self._startup_service.disable()
-        except Exception as e:
-            logger.warning(f"Could not apply auto-start preference: {e}")
 
     async def _handle_approval_request(self, tool_name: str, tool_args: str) -> bool:
         """Handle a tool approval request."""
@@ -261,7 +250,6 @@ class JarvisApplication:
         self._main_window.orb.show()
 
         await self.start_hotkeys()
-        await self.apply_autostart_preference()
 
         logger.info("GUI launched - floating orb and system tray are visible.")
 
@@ -278,12 +266,31 @@ class JarvisApplication:
 
             pipeline = get_voice_pipeline()
             if self._main_window is not None:
-                pipeline.set_wake_callback(self._main_window.on_wake_word)
+                from jarvis.ui.floating_orb import OrbState
 
-            await pipeline.start(self.agent.execute_task)
+                window = self._main_window
+                pipeline.set_wake_callback(window.on_wake_word)
+                pipeline.set_idle_callback(lambda: window.set_orb_state(OrbState.IDLE))
+
+            await pipeline.start(self._run_voice_task)
             logger.info("Voice pipeline active and listening in the background.")
         except Exception as e:
             logger.warning(f"Voice pipeline could not start: {e}")
+
+    async def _run_voice_task(self, text: str):
+        """Run a spoken request, mirroring it into the chat panel."""
+        window = self._main_window
+        if window is None:
+            return await self.agent.execute_task(text)
+
+        from jarvis.ui.floating_orb import OrbState
+
+        window.add_message("user", text)
+        window.set_orb_state(OrbState.EXECUTING)
+        task = await self.agent.execute_task(text)
+        window.add_message("assistant", str(task.result or task.error or "Done."))
+        window.set_orb_state(OrbState.SPEAKING)
+        return task
 
     # -- UI actions ----------------------------------------------------------
 
@@ -299,10 +306,14 @@ class JarvisApplication:
 
             pipeline = get_voice_pipeline()
             if pipeline.is_running:
-                asyncio.ensure_future(pipeline.stop())
-                logger.info("Voice pipeline stopping")
+                # Push-to-talk: listen for one request right now. This is the
+                # way in when no wake-word key is configured.
+                if self._main_window is not None:
+                    self._main_window.on_wake_word()
+                asyncio.ensure_future(pipeline.push_to_talk())
+                logger.info("Listening (push-to-talk)")
             else:
-                asyncio.ensure_future(pipeline.start(self.agent.execute_task))
+                asyncio.ensure_future(pipeline.start(self._run_voice_task))
                 logger.info("Voice pipeline starting")
         except Exception as e:
             logger.error(f"Voice pipeline toggle error: {e}")
@@ -525,7 +536,12 @@ class JarvisApplication:
         try:
             github = get_github_client()
             github_ok = await github.health_check()
-            checks.append(("GitHub Client", "API" if github_ok else "Token missing/invalid", github_ok))
+            has_token = bool(self.settings.github.token)
+            checks.append((
+                "GitHub Client",
+                "Authenticated" if has_token and github_ok else "No valid GITHUB_TOKEN (GitHub tools off)",
+                has_token and github_ok,
+            ))
         except Exception:
             checks.append(("GitHub Client", "Not configured", False))
 
@@ -535,6 +551,14 @@ class JarvisApplication:
             "Porcupine" if self.settings.voice.pv_access_key else "No PV_ACCESS_KEY (hands-free off)",
             bool(self.settings.voice.pv_access_key),
         ))
+
+        try:
+            from jarvis.voice.tts_provider import create_tts_provider
+
+            tts = await create_tts_provider()
+            checks.append(("Text-to-Speech", type(tts).__name__ if tts else "None available", tts is not None))
+        except Exception as e:
+            checks.append(("Text-to-Speech", f"Error: {e}", False))
 
         # Vision
         checks.append(("Vision Capture", "mss", True))
@@ -548,14 +572,21 @@ class JarvisApplication:
         checks.append(("Projects Directory", str(projects_dir), projects_dir.exists()))
 
         # Print results
+        # Features that need extra setup are reported without failing the run.
+        optional = {"Wake Word", "Text-to-Speech", "GitHub Client"}
         all_passed = True
         for name, value, passed in checks:
-            status = "[OK]" if passed else "[FAIL]"
-            print(f"  {status} {name:<25} {value}")
-            if not passed:
+            if passed:
+                status = "[OK]"
+            elif name in optional:
+                status = "[WARN]"
+            else:
+                status = "[FAIL]"
                 all_passed = False
+            print(f"  {status} {name:<25} {value}")
 
-        print(f"\n{'All checks passed!' if all_passed else 'Some checks failed!'}\n")
+        print(f"\n{'All required checks passed.' if all_passed else 'Some required checks failed!'}")
+        print("[WARN] marks an optional feature that is not configured.\n")
         return all_passed
 
 

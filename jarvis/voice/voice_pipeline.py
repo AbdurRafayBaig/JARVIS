@@ -29,6 +29,7 @@ class VoicePipeline:
         self._agent_callback: Optional[Callable[[str], Any]] = None
         self._wake_callback: Optional[Callable[[], Any]] = None
         self._busy = False
+        self._idle_callback: Optional[Callable[[], Any]] = None
 
     async def _initialize_providers(self) -> None:
         """Initialize STT, TTS and wake-word providers.
@@ -111,6 +112,19 @@ class VoicePipeline:
             logger.error(f"Wake word handling failed: {e}")
         finally:
             self._busy = False
+            if self._idle_callback:
+                try:
+                    await self._maybe_await(self._idle_callback())
+                except Exception:
+                    pass
+
+    def set_idle_callback(self, callback: Callable[[], Any]) -> None:
+        """Set a callback fired when an utterance has been fully handled."""
+        self._idle_callback = callback
+
+    async def push_to_talk(self) -> None:
+        """Listen for one utterance now and run it, without a wake word."""
+        await self._on_wake_word()
 
     @staticmethod
     async def _maybe_await(result: Any) -> Any:

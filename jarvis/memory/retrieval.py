@@ -67,14 +67,17 @@ class MemoryRetriever:
         except Exception as e:
             logger.warning(f"Failed to get preferences: {e}")
 
-        try:
-            similar = await self.vector_store.search(query, top_k=5)
-            context["similar_documents"] = [
-                {"text": entry.text, "score": score, "metadata": entry.metadata}
-                for entry, score in similar
-            ]
-        except Exception as e:
-            logger.warning(f"Failed to search vector store: {e}")
+        # Searching an empty store still costs an embedding call, which is a
+        # wasted API round trip on every single task.
+        if self.vector_store.count:
+            try:
+                similar = await self.vector_store.search(query, top_k=5)
+                context["similar_documents"] = [
+                    {"text": entry.text, "score": score, "metadata": entry.metadata}
+                    for entry, score in similar
+                ]
+            except Exception as e:
+                logger.warning(f"Failed to search vector store: {e}")
 
         return context
 

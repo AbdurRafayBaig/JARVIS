@@ -81,12 +81,10 @@ class WhisperSTT(STTProvider):
             return ""
 
     async def health_check(self) -> bool:
-        """Check if Whisper is available."""
-        try:
-            from faster_whisper import WhisperModel
-            return True
-        except ImportError:
-            return False
+        """Check if Whisper is installed, without paying for the import."""
+        import importlib.util
+
+        return importlib.util.find_spec("faster_whisper") is not None
 
 
 class GoogleSTT(STTProvider):
